@@ -1,12 +1,10 @@
-package com.bvotteler.rscp;
+package io.github.bvotteler.rscp;
 
-import com.bvotteler.rscp.util.ByteUtils;
+import io.github.bvotteler.rscp.util.ByteUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static com.bvotteler.rscp.util.ByteUtils.*;
 
 public class RSCPFrame {
     // byte sizes
@@ -52,19 +50,19 @@ public class RSCPFrame {
 
         RSCPFrame frame = new RSCPFrame();
 
-        byte[] control = copyBytesIntoNewArray(bytes, offsetCtrl, sizeCtrl);
+        byte[] control = ByteUtils.copyBytesIntoNewArray(bytes, offsetCtrl, sizeCtrl);
         frame.setControlBytes(control);
 
-        byte[] secs = copyBytesIntoNewArray(bytes, offsetTsSeconds, sizeTsSeconds);
-        long seconds = bytesToLong(reverseByteArray(secs));
-        byte[] nanos = copyBytesIntoNewArray(bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
-        int nanoSecs = bytesToInt(reverseByteArray(nanos));
+        byte[] secs = ByteUtils.copyBytesIntoNewArray(bytes, offsetTsSeconds, sizeTsSeconds);
+        long seconds = ByteUtils.bytesToLong(ByteUtils.reverseByteArray(secs));
+        byte[] nanos = ByteUtils.copyBytesIntoNewArray(bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
+        int nanoSecs = ByteUtils.bytesToInt(ByteUtils.reverseByteArray(nanos));
         frame.setTimestamp(seconds, nanoSecs);
 
-        byte[] length = copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
-        short dataLength = bytesToShort(reverseByteArray(length));
+        byte[] length = ByteUtils.copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
+        short dataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(length));
 
-        byte[] data = copyBytesIntoNewArray(bytes, offsetData, dataLength);
+        byte[] data = ByteUtils.copyBytesIntoNewArray(bytes, offsetData, dataLength);
 
         List<RSCPData> rscpDataList = RSCPData.of(data);
         frame.appendData(rscpDataList);
@@ -77,13 +75,13 @@ public class RSCPFrame {
             throw new IllegalArgumentException("Byte array is null, or too small to be a frame.");
         }
 
-        byte[] frameMagicBytes = copyBytesIntoNewArray(bytes, offsetMagic, sizeMagic);
+        byte[] frameMagicBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetMagic, sizeMagic);
         if (!Arrays.equals(frameMagicBytes, magicBytes)) {
             throw new IllegalArgumentException("Byte array does not contain magic bytes.");
         }
 
-        byte[] frameLengthBytes = copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
-        short frameDataLength = bytesToShort(reverseByteArray(frameLengthBytes));
+        byte[] frameLengthBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
+        short frameDataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(frameLengthBytes));
         if (frameDataLength < 0) {
             throw new IllegalArgumentException("Frame data length value is less than zero.");
         }
@@ -115,12 +113,12 @@ public class RSCPFrame {
         // first, add in magic bytes
         System.arraycopy(magicBytes, 0, bytes, offsetMagic, sizeMagic);
         // then control bytes
-        System.arraycopy(reverseByteArray(controlBytes), 0, bytes, offsetCtrl, sizeCtrl);
+        System.arraycopy(ByteUtils.reverseByteArray(controlBytes), 0, bytes, offsetCtrl, sizeCtrl);
         // then timestamps
-        System.arraycopy(reverseByteArray(ByteUtils.longToBytes(tsSeconds)), 0, bytes, offsetTsSeconds, sizeTsSeconds);
-        System.arraycopy(reverseByteArray(ByteUtils.intToBytes(tsNanoSeconds)), 0, bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(tsSeconds)), 0, bytes, offsetTsSeconds, sizeTsSeconds);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(tsNanoSeconds)), 0, bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
         // then length of data
-        System.arraycopy(reverseByteArray(ByteUtils.shortToBytes(dataByteCount)), 0, bytes, offsetLength, sizeLength);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.shortToBytes(dataByteCount)), 0, bytes, offsetLength, sizeLength);
         // then data
         int dataOffset = offsetData;
         for (RSCPData value : data) {
@@ -135,7 +133,7 @@ public class RSCPFrame {
         // finally, recalculate and add checksum if needed
         if (isChecksumBitSet()) {
             checksum = ByteUtils.calculateCRC32Checksum(bytes, 0, offsetEndOfData);
-            System.arraycopy(reverseByteArray(ByteUtils.intToBytes(checksum)), 0, bytes, offsetEndOfData, sizeCRC);
+            System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(checksum)), 0, bytes, offsetEndOfData, sizeCRC);
         }
 
         return bytes;

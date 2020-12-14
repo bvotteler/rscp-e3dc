@@ -1,19 +1,12 @@
-package com.bvotteler.rscp;
+package io.github.bvotteler.rscp;
 
-import com.bvotteler.rscp.util.ByteUtils;
+import io.github.bvotteler.rscp.util.ByteUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static com.bvotteler.rscp.util.ByteUtils.bytesToShort;
-import static com.bvotteler.rscp.util.ByteUtils.copyBytesIntoNewArray;
-import static com.bvotteler.rscp.util.ByteUtils.intToBytes;
-import static com.bvotteler.rscp.util.ByteUtils.longToBytes;
-import static com.bvotteler.rscp.util.ByteUtils.reverseByteArray;
-import static com.bvotteler.rscp.util.ByteUtils.truncateFirstNBytes;
 
 public class RSCPData {
     private static final Logger logger = LoggerFactory.getLogger(RSCPData.class);
@@ -49,21 +42,21 @@ public class RSCPData {
 
         RSCPData rscpData = new RSCPData();
 
-        byte[] tagNameBytes = copyBytesIntoNewArray(bytes, offsetDataTag, sizeDataTag);
-        rscpData.setDataTag(RSCPTag.getTagForBytes(reverseByteArray(tagNameBytes)));
+        byte[] tagNameBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataTag, sizeDataTag);
+        rscpData.setDataTag(RSCPTag.getTagForBytes(ByteUtils.reverseByteArray(tagNameBytes)));
 
         // single byte, no need to reverse
         RSCPDataType dataType = RSCPDataType.getDataTypeForBytes(bytes[offsetDataType]);
 
-        byte[] lengthBytes = copyBytesIntoNewArray(bytes, offsetDataLength, sizeDataLength);
-        short dataLength = bytesToShort(reverseByteArray(lengthBytes));
+        byte[] lengthBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataLength, sizeDataLength);
+        short dataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(lengthBytes));
 
         if (bytes.length < offsetData + dataLength) {
             logger.warn("Not enough bytes in data section to form complete RSCPValue instance (data truncated?)");
             return Collections.emptyList();
         }
 
-        byte[] data = copyBytesIntoNewArray(bytes, offsetData, dataLength);
+        byte[] data = ByteUtils.copyBytesIntoNewArray(bytes, offsetData, dataLength);
         rscpData.setDataWithType(data, dataType);
 
         rscpDataList.add(rscpData);
@@ -71,7 +64,7 @@ public class RSCPData {
         // more left to process?
         if (bytes.length > offsetData + dataLength) {
             // truncate bytes and start recursion
-            byte[] remainingBytes = truncateFirstNBytes(bytes, offsetData + dataLength);
+            byte[] remainingBytes = ByteUtils.truncateFirstNBytes(bytes, offsetData + dataLength);
             rscpDataList.addAll(RSCPData.of(remainingBytes));
         }
 
@@ -81,9 +74,9 @@ public class RSCPData {
     public byte[] getAsBytes() {
         byte[] bytes = new byte[offsetData + dataLength];
         // copy over to final position and reverse
-        System.arraycopy(reverseByteArray(getDataTagAsBytes()), 0, bytes, 0, sizeDataTag);
-        System.arraycopy(reverseByteArray(getDataTypeAsBytes()), 0, bytes, offsetDataType, sizeDataType);
-        System.arraycopy(reverseByteArray(ByteUtils.shortToBytes(dataLength)), 0, bytes, offsetDataLength, sizeDataLength);
+        System.arraycopy(ByteUtils.reverseByteArray(getDataTagAsBytes()), 0, bytes, 0, sizeDataTag);
+        System.arraycopy(ByteUtils.reverseByteArray(getDataTypeAsBytes()), 0, bytes, offsetDataType, sizeDataType);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.shortToBytes(dataLength)), 0, bytes, offsetDataLength, sizeDataLength);
         System.arraycopy(data, 0, bytes, offsetData, dataLength);
         return bytes;
     }
@@ -136,15 +129,15 @@ public class RSCPData {
     }
 
     public void setData(short value) {
-        setDataWithType(reverseByteArray(intToBytes(value)), RSCPDataType.INT16);
+        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.intToBytes(value)), RSCPDataType.INT16);
     }
 
     public void setData(int value) {
-        setDataWithType(reverseByteArray(intToBytes(value)), RSCPDataType.INT16);
+        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.intToBytes(value)), RSCPDataType.INT16);
     }
 
     public void setData(long value) {
-        setDataWithType(reverseByteArray(longToBytes(value)), RSCPDataType.INT32);
+        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.longToBytes(value)), RSCPDataType.INT32);
     }
 
     public void setData(boolean value) {
@@ -161,9 +154,9 @@ public class RSCPData {
 
     public void setTimeStampData(long seconds, int nanos) {
         byte[] timestamp = new byte[12];
-        System.arraycopy(reverseByteArray(longToBytes(seconds)), 0, timestamp, 0, 8);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(seconds)), 0, timestamp, 0, 8);
         // ignore nano seconds
-        System.arraycopy(reverseByteArray(intToBytes(nanos)), 0, timestamp, 8, 4);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(nanos)), 0, timestamp, 8, 4);
         setDataWithType(timestamp, RSCPDataType.TIMESTAMP);
     }
 

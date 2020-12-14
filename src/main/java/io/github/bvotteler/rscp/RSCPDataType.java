@@ -1,4 +1,4 @@
-package com.bvotteler.rscp;
+package io.github.bvotteler.rscp;
 
 import java.util.HashMap;
 import java.util.Map;

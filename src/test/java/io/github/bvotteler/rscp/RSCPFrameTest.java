@@ -1,6 +1,6 @@
-package com.bvotteler.rscp;
+package io.github.bvotteler.rscp;
 
-import com.bvotteler.rscp.util.ByteUtils;
+import io.github.bvotteler.rscp.util.ByteUtils;
 import org.hamcrest.Matchers;
 import org.junit.Test;
 

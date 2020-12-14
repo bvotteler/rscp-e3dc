@@ -4,15 +4,33 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.bvotteler</groupId>
+  <groupId>io.github.bvotteler</groupId>
   <artifactId>e3dc-rscp</artifactId>
   <version>0.9.0</version>
   <packaging>jar</packaging>
 
   <name>e3dc-rscp-lib</name>
-  <!-- FIXME change it to the project's website -->
-  <url>http://www.example.com</url>
-
+  <description>Blueprint project for Java libraries to be published on Maven Central</description>
+  <url>https://github.com/bvotteler/rscp-e3dc</url>
+  <developers>
+    <developer>
+      <name>Brendon Votteler</name>
+      <email>votteler@gmail.com</email>
+      <url>https://github.com/bvotteler</url>
+    </developer>
+  </developers>
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>http://www.opensource.org/licenses/mit-license.php</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>https://github.com/bvotteler/rscp-e3dc</url>
+    <connection>scm:git:git@github.com:bvotteler/rscp-e3dc.git</connection>
+    <developerConnection>scm:git:git@github.com:bvotteler/rscp-e3dc.git</developerConnection>
+  </scm>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>

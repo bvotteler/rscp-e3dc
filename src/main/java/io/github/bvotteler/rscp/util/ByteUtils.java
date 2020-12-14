@@ -1,4 +1,4 @@
-package com.bvotteler.rscp.util;
+package io.github.bvotteler.rscp.util;
 
 import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
