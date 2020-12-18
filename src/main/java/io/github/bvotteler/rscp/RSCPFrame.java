@@ -2,15 +2,20 @@ package io.github.bvotteler.rscp;
 
 import io.github.bvotteler.rscp.util.ByteUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.time.Instant;
+import java.util.*;
+
+import static io.github.bvotteler.rscp.util.ByteUtils.reverseByteArray;
 
 public class RSCPFrame {
     // byte sizes
     public static final int sizeMagic = 2;
     public static final int sizeCtrl = 2;
+
     public static final int sizeTsSeconds = 8;
+
     public static final int sizeTsNanoSeconds = 4;
     public static final int sizeLength = 2;
     // note: data size goes here, but is unknown as it is variable
@@ -29,45 +34,101 @@ public class RSCPFrame {
     public static final int offsetTsNanoSeconds = offsetTsSeconds + sizeTsSeconds;
     public static final int offsetLength = offsetTsNanoSeconds + sizeTsNanoSeconds;
     public static final int offsetData = offsetLength + sizeLength;
-    // used to make sure we have a minimum size of bytes to work with
-    public static final int minimumFrameSize = offsetData;
     private static final byte[] magicBytes = ByteUtils.hexStringToByteArray("E3DC");
-    private byte[] controlBytes = new byte[sizeCtrl];
-    private long tsSeconds;
-    private int tsNanoSeconds;
-    private short dataByteCount;
-    private List<RSCPData> data = new ArrayList<RSCPData>();
-    private int checksum;
+    private final byte[] controlBytes;
+    private final Instant timestamp;
+    private final List<RSCPData> data;
 
-    // constructor
-    public RSCPFrame() {
-        // set some basics
-        setControlBytesToDefault();
+    RSCPFrame(byte[] controlBytes, Instant timestamp, List<RSCPData> dataList, boolean enableChecksum) {
+        this.controlBytes = controlBytes;
+        this.timestamp = timestamp;
+        this.data = dataList;
+        setChecksumBitTo(enableChecksum);
     }
 
-    public static RSCPFrame of(byte[] bytes) {
-        validateBytesCanBeFrameElseThrow(bytes);
+    /**
+     * Get a builder to construct an {@link RSCPFrame}.
+     * @return A builder ({@link RSCPFrame.Builder});
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
 
-        RSCPFrame frame = new RSCPFrame();
+    /**
+     * Get the data contained in this frame as a list of {@link RSCPData} elements.
+     * @return The data in this frame as a list.
+     */
+    public List<RSCPData> getData() {
+        if (data == null) {
+            return Collections.emptyList();
+        }
+        return data;
+    }
 
-        byte[] control = ByteUtils.copyBytesIntoNewArray(bytes, offsetCtrl, sizeCtrl);
-        frame.setControlBytes(control);
+    /**
+     * Get the size of the data in bytes.
+     * @return Total byte count of all data elements in this frame.
+     */
+    public int getDataByteCount() {
+        if (data == null) {
+            return 0;
+        }
 
-        byte[] secs = ByteUtils.copyBytesIntoNewArray(bytes, offsetTsSeconds, sizeTsSeconds);
-        long seconds = ByteUtils.bytesToLong(ByteUtils.reverseByteArray(secs));
-        byte[] nanos = ByteUtils.copyBytesIntoNewArray(bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
-        int nanoSecs = ByteUtils.bytesToInt(ByteUtils.reverseByteArray(nanos));
-        frame.setTimestamp(seconds, nanoSecs);
+        return data.stream()
+                .mapToInt(RSCPData::getByteCount)
+                .sum();
+    }
 
-        byte[] length = ByteUtils.copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
-        short dataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(length));
+    /**
+     * <p>Get frame content as byte array. Will calculate and append checksum CRC if needed.</p>
+     * <p>See also {@link Builder#withChecksum()} or {@link Builder#withoutChecksum()}.</p>
+     *
+     * @return Byte array ready to be encrypted and sent.
+     */
+    public byte[] getAsByteArray() {
 
-        byte[] data = ByteUtils.copyBytesIntoNewArray(bytes, offsetData, dataLength);
+        // calculate size needed
+        int sizeNeeded = getFrameByteCount();
 
-        List<RSCPData> rscpDataList = RSCPData.of(data);
-        frame.appendData(rscpDataList);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(sizeNeeded).order(ByteOrder.LITTLE_ENDIAN);
+        byteBuffer.put(magicBytes);
+        byteBuffer.put(controlBytes);
+        byteBuffer.putLong(timestamp.getEpochSecond());
+        byteBuffer.putInt(timestamp.getNano());
+        // skip length, coming back to it, move cursor to where the data block begins
+        byteBuffer.position(offsetData);
+        int offsetEndOfData = offsetData;
+        for (RSCPData value : data) {
+            int byteSize = value.getByteCount();
+            byteBuffer.put(value.getAsByteArray());
+            offsetEndOfData += byteSize; // move offset along
+        }
+        // set length now that we know it
+        short dataByteCount = (short) (offsetEndOfData - offsetData);
+        byteBuffer.putShort(offsetLength, dataByteCount);
 
-        return frame;
+        if (isChecksumBitSet()) {
+            byte[] data = byteBuffer.array();
+            int checksum = ByteUtils.calculateCRC32Checksum(data, 0, offsetEndOfData);
+            byteBuffer.putInt(offsetEndOfData, checksum);
+        }
+
+        return byteBuffer.array();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RSCPFrame rscpFrame = (RSCPFrame) o;
+        return Arrays.equals(controlBytes, rscpFrame.controlBytes) && timestamp.equals(rscpFrame.timestamp) && data.equals(rscpFrame.data);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(timestamp, data);
+        result = 31 * result + Arrays.hashCode(controlBytes);
+        return result;
     }
 
     private static void validateBytesCanBeFrameElseThrow(byte[] bytes) {
@@ -81,141 +142,146 @@ public class RSCPFrame {
         }
 
         byte[] frameLengthBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetLength, sizeLength);
-        short frameDataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(frameLengthBytes));
+        short frameDataLength = ByteUtils.bytesToShort(reverseByteArray(frameLengthBytes));
         if (frameDataLength < 0) {
             throw new IllegalArgumentException("Frame data length value is less than zero.");
         }
     }
 
-    private void setControlBytesToDefault() {
-        this.controlBytes = ByteUtils.hexStringToByteArray("1100");
+    private int getFrameByteCount() {
+        return offsetData + getDataByteCount() + (isChecksumBitSet() ? sizeCRC : 0);
     }
 
-    private void setControlBytes(byte[] bytes) {
-        this.controlBytes = bytes;
-    }
-
-    /**
-     * Get frame content as bytes. Will calculate and insert checksum CRC if needed.
-     *
-     * @param setTimeStampToNow If true, it will use System.currentTimeMillis() to set frame timestamp.
-     * @return Byte array ready to be encrypted and sent.
-     */
-    public byte[] getAsBytes(boolean setTimeStampToNow) {
-        if (setTimeStampToNow) {
-            setTimeStampToNow();
-        }
-
-        // calculate size needed
-        int sizeNeeded = getFrameByteCount();
-
-        byte[] bytes = new byte[sizeNeeded];
-        // first, add in magic bytes
-        System.arraycopy(magicBytes, 0, bytes, offsetMagic, sizeMagic);
-        // then control bytes
-        System.arraycopy(ByteUtils.reverseByteArray(controlBytes), 0, bytes, offsetCtrl, sizeCtrl);
-        // then timestamps
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(tsSeconds)), 0, bytes, offsetTsSeconds, sizeTsSeconds);
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(tsNanoSeconds)), 0, bytes, offsetTsNanoSeconds, sizeTsNanoSeconds);
-        // then length of data
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.shortToBytes(dataByteCount)), 0, bytes, offsetLength, sizeLength);
-        // then data
-        int dataOffset = offsetData;
-        for (RSCPData value : data) {
-            int byteSize = value.getByteCount();
-            System.arraycopy(value.getAsBytes(), 0, bytes, dataOffset, byteSize);
-            dataOffset += byteSize; // move offset along
-        }
-
-        // now dataOffset points to end of data, so use it for next guy
-        final int offsetEndOfData = dataOffset;
-
-        // finally, recalculate and add checksum if needed
-        if (isChecksumBitSet()) {
-            checksum = ByteUtils.calculateCRC32Checksum(bytes, 0, offsetEndOfData);
-            System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(checksum)), 0, bytes, offsetEndOfData, sizeCRC);
-        }
-
-        return bytes;
-    }
-
-    /**
-     * Get frame content as bytes. Will calculate and insert checksum CRC if needed.
-     * <p>
-     * Note: Will NOT refresh the timestamp for the frame.
-     *
-     * @return Byte array ready to be encrypted and sent.
-     */
-    public byte[] getAsBytes() {
-        return getAsBytes(false);
-    }
-
-    public void appendData(RSCPData value) {
-        data.add(value);
-        // update length of data
-        dataByteCount += value.getByteCount();
-    }
-
-    public void appendData(List<RSCPData> valueList) {
-        for (RSCPData value : valueList) {
-            appendData(value);
-        }
-    }
-
-    public List<RSCPData> getData() {
-        return data;
-    }
-
-    public long getTsSeconds() {
-        return tsSeconds;
-    }
-
-    public void setTimestamp(long seconds, int nanoSeconds) {
-        this.tsSeconds = seconds;
-        this.tsNanoSeconds = nanoSeconds;
-    }
-
-    public int getTsNanoSeconds() {
-        return tsNanoSeconds;
-    }
-
-    public boolean isChecksumBitSet() {
+    private boolean isChecksumBitSet() {
         // grab first ctrl byte
-        byte ctrlPart1 = this.controlBytes[0];
+        byte ctrlPart1 = this.controlBytes[1];
         // the 4th least significant bit is the CRC flag
         int bitPosition = 4;  // Position of this bit in a byte
 
         return (ctrlPart1 >> bitPosition & 1) == 1;
     }
 
-    public int getFrameByteCount() {
-        return offsetData + getDataByteCount() + (isChecksumBitSet() ? sizeCRC : 0);
-    }
-
-    // adds up indicated byte size of all entries in data (RSCPValue instances) and returns that value
-    public int getDataByteCount() {
-        int size = 0;
-        for (RSCPData value : data) {
-            size += value.getByteCount();
-        }
-        return size;
-    }
-
-    public void setChecksumBitTo(boolean flag) {
+    private void setChecksumBitTo(boolean flag) {
         int bitPosition = 4;
-        controlBytes[0] = (flag) ?
-                ((byte) (controlBytes[0] | (1 << bitPosition)))
-                : ((byte) (controlBytes[0] & ~(1 << bitPosition)));
+        controlBytes[1] = (flag) ?
+                ((byte) (controlBytes[1] | (1 << bitPosition)))
+                : ((byte) (controlBytes[1] & ~(1 << bitPosition)));
     }
+    public static class Builder {
 
-    public int getChecksum() {
-        return checksum;
-    }
+        private byte[] controlBytes = reverseByteArray(ByteUtils.hexStringToByteArray("1100"));
+        private Instant timestamp;
+        private List<RSCPData> dataList = new ArrayList<>();
+        private boolean enableChecksum = true;
 
-    public void setTimeStampToNow() {
-        // get system time stamp
-        long tsInMillis = System.currentTimeMillis();
-        tsSeconds = tsInMillis / 1000;
-        tsNanoSeconds = (int) ((tsInMillis % 1000) * 1000 * 1000);
+        Builder() {
+        }
+
+        /**
+         * <p>Read in a frame from raw bytes.</p>
+         * <p>This will attempt to re-construct the entire {@link RSCPFrame}, assuming the raw data can be validated.</p>
+         * @param bytes Raw bytes, typically received from IO when communicating with an E3DC server.
+         * @return A constructed {@link RSCPFrame}. Throws {@link IllegalArgumentException} if the provided bytes are misformed. Throws {@link IllegalStateException} when validation during construction fails.
+         */
+        public RSCPFrame buildFromRawBytes(byte[] bytes) {
+            validateBytesCanBeFrameElseThrow(bytes);
+            ByteBuffer byteBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+            byteBuffer.rewind();
+
+            this.controlBytes = new byte[sizeCtrl];
+            byteBuffer.position(offsetCtrl);
+            byteBuffer.get(this.controlBytes, 0, this.controlBytes.length);
+
+            long epochSecs = byteBuffer.getLong(offsetTsSeconds);
+            int nanos = byteBuffer.getInt(offsetTsNanoSeconds);
+            this.timestamp = Instant.ofEpochSecond(epochSecs, nanos);
+
+            short dataLength = byteBuffer.getShort(offsetLength);
+
+            byte[] data = new byte[dataLength];
+            byteBuffer.position(offsetData);
+            byteBuffer.get(data, 0, dataLength);
+
+            this.dataList = RSCPData.builder().buildFromRawBytes(data);
+
+            return build();
+        }
+
+        public Builder controlBytes(byte[] controlBytes) {
+            this.controlBytes = controlBytes;
+            return this;
+        }
+
+        /**
+         * Set the timestamp - required when constructing a frame.
+         * @param timestamp An {@link Instant} to be set as the timestamp for the constructed {@link RSCPFrame}.
+         * @return The builder.
+         */
+        public Builder timestamp(Instant timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        /**
+         * Appends provided {@link RSCPData} to the data block under construction.
+         * @param dataList List of {@link RSCPData}.
+         * @return The builder.
+         */
+        public Builder addData(List<RSCPData> dataList) {
+            this.dataList.addAll(dataList);
+            return this;
+        }
+
+        /**
+         * Appends provided {@link RSCPData} to the data block under construction.
+         * @param data The {@link RSCPData} to append.
+         * @return The builder.
+         */
+        public Builder addData(RSCPData data) {
+            this.dataList.add(data);
+            return this;
+        }
+
+        /**
+         * <p>Explicitly indicate that a checksum should be included in the resulting {@link RSCPFrame}'s raw data.</p>
+         * <p>The default assumption is that a checksum should be included.
+         * Making a call to this optional (e.g. if we want to make it obvious).</p>
+         * <p>See also {@link Builder#withoutChecksum()}.</p>.
+         * @return The builder.
+         */
+        public Builder withChecksum() {
+            this.enableChecksum = true;
+            return this;
+        }
+
+        /**
+         * Indicate that we do not want a checksum to be included in the resulting {@link RSCPFrame}'s raw data.
+         * @return The builder.
+         */
+        public Builder withoutChecksum() {
+            this.enableChecksum = false;
+            return this;
+        }
+
+        /**
+         * Validates and creates an instance of {@link RSCPFrame}.
+         * @return The built {@link RSCPFrame}. Throws an {@link IllegalStateException} if validation fails.
+         */
+        public RSCPFrame build() {
+            validate();
+            return new RSCPFrame(controlBytes, timestamp, dataList, enableChecksum);
+        }
+
+        public void validate() {
+            if (timestamp == null) {
+                throw new IllegalStateException("Timestamp value is required.");
+            }
+            if (controlBytes == null || controlBytes.length != RSCPFrame.sizeCtrl) {
+                throw new IllegalStateException("Control bytes are null or have incorrect length (expected length: " + sizeCtrl +").");
+            }
+            if (dataList == null || dataList.isEmpty()) {
+                throw new IllegalStateException("Value list cannot be null or empty.");
+            }
+        }
     }
 }

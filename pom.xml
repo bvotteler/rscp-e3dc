@@ -6,7 +6,7 @@
 
   <groupId>io.github.bvotteler</groupId>
   <artifactId>e3dc-rscp</artifactId>
-  <version>0.9.0</version>
+  <version>0.9.1</version>
   <packaging>jar</packaging>
 
   <name>e3dc-rscp-lib</name>

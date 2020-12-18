@@ -4,9 +4,15 @@ import io.github.bvotteler.rscp.util.ByteUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+
+import static io.github.bvotteler.rscp.RSCPFrame.sizeTsNanoSeconds;
+import static io.github.bvotteler.rscp.RSCPFrame.sizeTsSeconds;
 
 public class RSCPData {
     private static final Logger logger = LoggerFactory.getLogger(RSCPData.class);
@@ -26,58 +32,49 @@ public class RSCPData {
     private static final int offsetDataLength = offsetDataType + sizeDataType;
     private static final int offsetData = offsetDataLength + sizeDataLength;
 
-    private short dataLength;
-    private byte[] data; // unknown size
+    private final RSCPTag dataTag;
+    private final RSCPDataType dataType;
+    private final short dataLength;
+    private final byte[] value; // unknown size
 
-    private RSCPTag dataTag;
-    private RSCPDataType dataType;
-
-    public static List<RSCPData> of(byte[] bytes) {
-        if (bytes == null || bytes.length < offsetData) {
-            logger.warn("Not enough bytes to form RSCPData instance(s), returning empty list (data truncated?).");
-            return Collections.emptyList();
-        }
-
-        List<RSCPData> rscpDataList = new ArrayList<>();
-
-        RSCPData rscpData = new RSCPData();
-
-        byte[] tagNameBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataTag, sizeDataTag);
-        rscpData.setDataTag(RSCPTag.getTagForBytes(ByteUtils.reverseByteArray(tagNameBytes)));
-
-        // single byte, no need to reverse
-        RSCPDataType dataType = RSCPDataType.getDataTypeForBytes(bytes[offsetDataType]);
-
-        byte[] lengthBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataLength, sizeDataLength);
-        short dataLength = ByteUtils.bytesToShort(ByteUtils.reverseByteArray(lengthBytes));
-
-        if (bytes.length < offsetData + dataLength) {
-            logger.warn("Not enough bytes in data section to form complete RSCPValue instance (data truncated?)");
-            return Collections.emptyList();
-        }
-
-        byte[] data = ByteUtils.copyBytesIntoNewArray(bytes, offsetData, dataLength);
-        rscpData.setDataWithType(data, dataType);
-
-        rscpDataList.add(rscpData);
-
-        // more left to process?
-        if (bytes.length > offsetData + dataLength) {
-            // truncate bytes and start recursion
-            byte[] remainingBytes = ByteUtils.truncateFirstNBytes(bytes, offsetData + dataLength);
-            rscpDataList.addAll(RSCPData.of(remainingBytes));
-        }
-
-        return rscpDataList;
+    RSCPData(RSCPTag dataTag, RSCPDataType dataType, byte[] value) {
+        this.dataTag = dataTag;
+        this.dataType = dataType;
+        this.value = value;
+        this.dataLength = (short) value.length;
     }
 
-    public byte[] getAsBytes() {
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public RSCPTag getDataTag() {
+        return dataTag;
+    }
+
+    public RSCPDataType getDataType() {
+        return dataType;
+    }
+
+    public byte[] getValueAsByteArray() {
+        return value;
+    }
+
+    public List<RSCPData> getContainerData() {
+        if (RSCPDataType.CONTAINER != getDataType()) {
+            return Collections.emptyList();
+        } else {
+            return RSCPData.builder().buildFromRawBytes(getValueAsByteArray());
+        }
+    }
+
+    public byte[] getAsByteArray() {
         byte[] bytes = new byte[offsetData + dataLength];
         // copy over to final position and reverse
         System.arraycopy(ByteUtils.reverseByteArray(getDataTagAsBytes()), 0, bytes, 0, sizeDataTag);
         System.arraycopy(ByteUtils.reverseByteArray(getDataTypeAsBytes()), 0, bytes, offsetDataType, sizeDataType);
         System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.shortToBytes(dataLength)), 0, bytes, offsetDataLength, sizeDataLength);
-        System.arraycopy(data, 0, bytes, offsetData, dataLength);
+        System.arraycopy(value, 0, bytes, offsetData, dataLength);
         return bytes;
     }
 
@@ -85,93 +82,23 @@ public class RSCPData {
         return offsetData + dataLength;
     }
 
-    public int getDataByteCount() {
-        return dataLength;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RSCPData rscpData = (RSCPData) o;
+        return dataLength == rscpData.dataLength && Arrays.equals(value, rscpData.value) && dataTag == rscpData.dataTag && dataType == rscpData.dataType;
     }
 
-    public void appendData(byte[] bytes) {
-        int oldLength = this.dataLength;
-        int additionalLength = bytes.length;
-        // pretty expensive because we copy and create new.
-        // TODO: this can be optimized using builders
-        byte[] newData = new byte[oldLength + additionalLength];
-        if (oldLength > 0) {
-            System.arraycopy(this.data, 0, newData, 0, oldLength);
-        }
-        if (additionalLength > 0) {
-            System.arraycopy(bytes, 0, newData, oldLength, additionalLength);
-        }
-        this.data = newData;
-        this.dataLength += additionalLength;
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(dataLength, dataTag, dataType);
+        result = 31 * result + Arrays.hashCode(value);
+        return result;
     }
-
-    public void appendData(RSCPData value) {
-        appendData(value.getAsBytes());
-    }
-
-    public void appendData(List<RSCPData> values) {
-        for (RSCPData value : values) {
-            appendData(value);
-        }
-    }
-
-    public byte[] getData() {
-        return data;
-    }
-
-    // a few helpers for some simple types
-    public void setData(RSCPData value) {
-        setDataWithType(value.getAsBytes(), RSCPDataType.CONTAINER);
-    }
-
-    public void setData(String value) {
-        setDataWithType(value.getBytes(), RSCPDataType.STRING);
-    }
-
-    public void setData(short value) {
-        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.intToBytes(value)), RSCPDataType.INT16);
-    }
-
-    public void setData(int value) {
-        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.intToBytes(value)), RSCPDataType.INT16);
-    }
-
-    public void setData(long value) {
-        setDataWithType(ByteUtils.reverseByteArray(ByteUtils.longToBytes(value)), RSCPDataType.INT32);
-    }
-
-    public void setData(boolean value) {
-        byte[] flag = new byte[1];
-        flag[0] = (byte) ((value) ? 0xFF : 0x00);
-        setDataWithType(flag, RSCPDataType.BOOL);
-    }
-
-    public void setDataWithType(byte[] bytes, RSCPDataType dataType) {
-        this.data = bytes;
-        this.dataLength = (short) data.length;
-        setDataType(dataType);
-    }
-
-    public void setTimeStampData(long seconds, int nanos) {
-        byte[] timestamp = new byte[12];
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(seconds)), 0, timestamp, 0, 8);
-        // ignore nano seconds
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(nanos)), 0, timestamp, 8, 4);
-        setDataWithType(timestamp, RSCPDataType.TIMESTAMP);
-    }
-
-    // TODO: could add more setData helpers.
 
     private byte[] getDataTagAsBytes() {
         return dataTag.getValueAsBytes();
-    }
-
-    public RSCPTag getDataTag() {
-        return dataTag;
-    }
-
-    public void setDataTag(RSCPTag dataTag) {
-        this.dataTag = dataTag;
     }
 
     private byte[] getDataTypeAsBytes() {
@@ -180,19 +107,293 @@ public class RSCPData {
         return bytes;
     }
 
-    public RSCPDataType getDataType() {
-        return dataType;
-    }
+    public static class Builder {
+        private RSCPTag dataTag;
+        private RSCPDataType dataType;
+        private byte[] value;
 
-    public void setDataType(RSCPDataType dataType) {
-        this.dataType = dataType;
-    }
+        Builder() {
+        }
 
-    public List<RSCPData> getContainerData() {
-        if (RSCPDataType.CONTAINER != getDataType()) {
-            return Collections.emptyList();
-        } else {
-            return RSCPData.of(getData());
+        /**
+         * <p>Build a list of {@link RSCPData} instances given provided raw data.</p>
+         * <p>This method will try to do some basic validations. Will throw {@link IllegalStateException} if the data cannot be validated before construction.</p>
+         * @param bytes Raw bytes, typically received from IO when communicating with an E3DC server, or extracted from the value of an {@link RSCPData} with data type {@link RSCPDataType#CONTAINER}.
+         * @return A list of constructed {@link RSCPData} instances.
+         */
+        public List<RSCPData> buildFromRawBytes(byte[] bytes) {
+            if (bytes == null || bytes.length < offsetData) {
+                logger.warn("Not enough bytes to form RSCPData instance(s), returning empty list (data truncated?).");
+                return Collections.emptyList();
+            }
+
+            List<RSCPData> rscpDataList = new ArrayList<>();
+
+            byte[] tagNameBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataTag, sizeDataTag);
+            RSCPTag tag = RSCPTag.getTagForBytes(ByteUtils.reverseByteArray(tagNameBytes));
+
+            // single byte, no need to reverse
+            RSCPDataType dataType = RSCPDataType.getDataTypeForBytes(bytes[offsetDataType]);
+
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Short.BYTES).put(bytes, offsetDataLength, sizeDataLength);
+            byteBuffer.flip();
+            short dataLength = byteBuffer.getShort();
+
+            if (bytes.length < offsetData + dataLength) {
+                logger.warn("Not enough bytes in data section to form complete RSCPValue instance (data truncated?)");
+                return Collections.emptyList();
+            }
+
+            byte[] data = ByteUtils.copyBytesIntoNewArray(bytes, offsetData, dataLength);
+
+            RSCPData rscpData = RSCPData.builder()
+                    .tag(tag)
+                    .valueOfType(dataType, data)
+                    .build();
+
+            rscpDataList.add(rscpData);
+
+            // more left to process?
+            if (bytes.length > offsetData + dataLength) {
+                // truncate bytes and start recursion
+                byte[] remainingBytes = ByteUtils.truncateFirstNBytes(bytes, offsetData + dataLength);
+                rscpDataList.addAll(buildFromRawBytes(remainingBytes));
+            }
+
+            return rscpDataList;
+        }
+
+        /**
+         * Define the tag for this instance. See {@link RSCPTag}.
+         * @param tag The tag to set.
+         * @return The builder.
+         */
+        public Builder tag(RSCPTag tag) {
+            this.dataTag = tag;
+            return this;
+        }
+
+        /**
+         * <p>Define the data type and value for this instance.</p>
+         * <p>Typically, it will be easier to construct the data type and value pairs with other helper methods.</p>
+         * <p>For examples, see {@link Builder#boolValue(boolean)}, {@link Builder#char8Value(char)},
+         * {@link Builder#int16Value(short)} , {@link Builder#int32Value(int)}, {@link Builder#stringValue(String)},
+         * {@link Builder#float32Value(float)}, {@link Builder#double64Value(double)}, {@link Builder#timestampValue(Instant)} etc.</p>
+         * @param dataType The {@link RSCPDataType} to associate the value with.
+         * @param value The raw data as byte array.
+         * @return The builder.
+         */
+        public Builder valueOfType(RSCPDataType dataType, byte[] value) {
+            this.dataType = dataType;
+            this.value = value;
+            return this;
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#TIMESTAMP} and value from an {@link Instant}.
+         * @param timestamp The value.
+         * @return The builder.
+         */
+        public Builder timestampValue(Instant timestamp) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(sizeTsSeconds + sizeTsNanoSeconds).putLong(timestamp.getEpochSecond()).putInt(timestamp.getNano());
+            byte[] timestampBytes = byteBuffer.array();
+
+            return valueOfType(RSCPDataType.TIMESTAMP, timestampBytes);
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#TIMESTAMP} and value from a {@link Duration}.
+         * @param duration The value.
+         * @return The builder.
+         */
+        public Builder timestampValue(Duration duration) {
+            return timestampValue(Instant.ofEpochSecond(duration.getSeconds(), duration.getNano()));
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#BOOL}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder boolValue(boolean value) {
+            byte[] flag = new byte[1];
+            flag[0] = (byte) ((value) ? 0xFF : 0x00);
+            return valueOfType(RSCPDataType.BOOL,flag);
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#CHAR8}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder char8Value(char value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Character.BYTES).putChar(value);
+            return valueOfType(RSCPDataType.CHAR8, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#UCHAR8}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder uchar8Value(char value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Character.BYTES).putChar(value);
+            return valueOfType(RSCPDataType.UCHAR8, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#INT16}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder int16Value(short value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Short.BYTES).putShort(value);
+            return valueOfType(RSCPDataType.INT16, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#UINT16}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder uint16Value(short value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Short.BYTES).putShort(value);
+            return valueOfType(RSCPDataType.UINT16, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#INT32}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder int32Value(int value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Integer.BYTES).putInt(value);
+            return valueOfType(RSCPDataType.INT32, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#UINT32}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder uint32Value(int value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Integer.BYTES).putInt(value);
+            return valueOfType(RSCPDataType.UINT32, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#INT64}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder int64Value(long value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Long.BYTES).putLong(value);
+            return valueOfType(RSCPDataType.INT64, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#UINT64}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder uint64Value(long value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Long.BYTES).putLong(value);
+            return valueOfType(RSCPDataType.UINT64, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#FLOAT32}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder float32Value(float value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Float.BYTES).putFloat(value);
+            return valueOfType(RSCPDataType.FLOAT32, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#DOUBLE64}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder double64Value(double value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Double.BYTES).putDouble(value);
+            return valueOfType(RSCPDataType.DOUBLE64, byteBuffer.array());
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#STRING}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder stringValue(String value) {
+            return valueOfType(RSCPDataType.STRING, value.getBytes(StandardCharsets.UTF_8));
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#BYTEARRAY}) and value.
+         * @param value The value.
+         * @return The builder.
+         */
+        public Builder byteArrayValue(byte[] value) {
+            return valueOfType(RSCPDataType.BYTEARRAY, value);
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#CONTAINER}) and a list of RSCPData as the value.
+         * @param dataList A list of {@link RSCPData} instances.
+         * @return The builder.
+         */
+        public Builder containerValues(List<RSCPData> dataList) {
+            this.dataType = RSCPDataType.CONTAINER;
+            dataList.forEach(data -> appendBytes(data.getAsByteArray()));
+
+            return this;
+        }
+
+        /**
+         * Set the data type ({@link RSCPDataType#CONTAINER}) and an instance of RSCPData as the value.
+         * @param value A {@link RSCPData} instance.
+         * @return The builder.
+         */
+        public Builder containerValue(RSCPData value) {
+            return containerValues(Collections.singletonList(value));
+        }
+
+        private void appendBytes(byte[] bytes) {
+            if (bytes == null || bytes.length < 1) {
+                return;
+            }
+            int oldValueSize = (value != null) ? value.length : 0;
+            int newSize = bytes.length + oldValueSize;
+            byte[] newValue = new byte[newSize];
+
+            if (value != null) {
+                System.arraycopy(value, 0, newValue, 0, oldValueSize);
+            }
+            System.arraycopy(bytes, 0, newValue, oldValueSize, bytes.length);
+            this.value = newValue;
+        }
+
+        public RSCPData build() {
+            validate();
+            return new RSCPData(dataTag, dataType, value);
+        }
+
+        private ByteBuffer getLittleEndianByteBuffer(int capacity) {
+            return ByteBuffer.allocate(capacity).order(ByteOrder.LITTLE_ENDIAN);
+        }
+
+        private void validate() {
+            if (dataTag == null) {
+                throw new IllegalStateException("Tag value is required.");
+            }
+            if (dataType == null) {
+                throw new IllegalStateException("DataType value is required.");
+            }
+            if (value == null || value.length == 0) {
+                throw new IllegalStateException("Data must not be empty.");
+            }
         }
     }
 }

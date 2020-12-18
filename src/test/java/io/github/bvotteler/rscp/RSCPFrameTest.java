@@ -4,13 +4,15 @@ import io.github.bvotteler.rscp.util.ByteUtils;
 import org.hamcrest.Matchers;
 import org.junit.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.Assert.assertThat;
 
 public class RSCPFrameTest {
 
@@ -48,9 +50,9 @@ public class RSCPFrameTest {
     @Test
     public void knownDataRequestFrameToBytesToFrame() {
         // using a "known" request frame pattern
-        byte[] reqFrame = buildDataBaseRequestMessage(42, 900, 900);
+        byte[] reqFrame = buildDataBaseRequestMessageFromTemplate(42, 900, 900);
 
-        RSCPFrame actual = RSCPFrame.of(reqFrame);
+        RSCPFrame actual = RSCPFrame.builder().buildFromRawBytes(reqFrame);
 
         assertThat(actual.getData(), hasSize(1));
         RSCPData container = actual.getData().get(0);
@@ -77,34 +79,18 @@ public class RSCPFrameTest {
         long timeSpan = 3 * interval; // 3 intervals.
 
         // build request starting with a container
-        RSCPData reqContainer = new RSCPData();
-        reqContainer.setDataTag(RSCPTag.TAG_DB_REQ_HISTORY_DATA_DAY);
-        reqContainer.setDataType(RSCPDataType.CONTAINER);
-
-        // build parameters
-        RSCPData reqTimeStart = new RSCPData();
-        reqTimeStart.setDataTag(RSCPTag.TAG_DB_REQ_HISTORY_TIME_START);
-        reqTimeStart.setTimeStampData(timeStart, 0);
-
-        RSCPData reqInterval = new RSCPData();
-        reqInterval.setDataTag(RSCPTag.TAG_DB_REQ_HISTORY_TIME_INTERVAL);
-        reqInterval.setTimeStampData(interval, 0);
-
-        RSCPData reqTimeSpan = new RSCPData();
-        reqTimeSpan.setDataTag(RSCPTag.TAG_DB_REQ_HISTORY_TIME_SPAN);
-        reqTimeSpan.setTimeStampData(timeSpan, 0);
-
-        // put request params into the container
-        reqContainer.appendData(Arrays.asList(reqTimeStart, reqInterval, reqTimeSpan));
+        RSCPData reqContainer = RSCPDataTest.buildSampleDBRequestContainer(Instant.ofEpochSecond(timeStart), Duration.ofSeconds(interval), Duration.ofSeconds(timeSpan));
 
         // build frame and append the request container
-        RSCPFrame reqFrame = new RSCPFrame();
-        reqFrame.appendData(reqContainer);
-        // get as bytes with refreshed timestamp (not needed for test, but for demonstration)
-        byte[] requestWithTS = reqFrame.getAsBytes(true);
+        RSCPFrame reqFrame = RSCPFrame.builder()
+                .addData(reqContainer)
+                .timestamp(Instant.ofEpochSecond(14))
+                .withChecksum()
+                .build();
+        byte[] requestWithTS = reqFrame.getAsByteArray();
 
         // reverse: feed bytes to create a frame instance to be inspected.
-        RSCPFrame frameFromBytes = RSCPFrame.of(requestWithTS);
+        RSCPFrame frameFromBytes = RSCPFrame.builder().buildFromRawBytes(requestWithTS);
 
         assertThat(frameFromBytes.getData(), hasSize(1));
 
@@ -128,7 +114,7 @@ public class RSCPFrameTest {
         return ByteUtils.hexStringToByteArray(template);
     }
 
-    private byte[] buildDataBaseRequestMessage(long timeStart, long interval, long timeSpan) {
+    private byte[] buildDataBaseRequestMessageFromTemplate(long timeStart, long interval, long timeSpan) {
         // copied this from some real comms to have a reference.
         String template = "E3 DC 00 11 00 00 00 00 00 00 00 00 00 00 00 00 40 00 00 01 00 06 0E 39 00 01 01 00 06 0F 0C 00 00 00 00 00 00 00 00 00 00 00 00 00 02 01 00 06 0F 0C 00 00 00 00 00 00 00 00 00 00 00 00 00 03 01 00 06 0F 0C 00 00 00 00 00 00 00 00 00 00 00 00 00 AA AA AA AA".replaceAll("\\s+", "");
         byte[] frame = ByteUtils.hexStringToByteArray(template);
@@ -159,20 +145,25 @@ public class RSCPFrameTest {
     }
 
     private byte[] buildAuthenticationMessage(String user, String password) {
-        RSCPData authUser = new RSCPData();
-        authUser.setDataTag(RSCPTag.TAG_RSCP_AUTHENTICATION_USER);
-        authUser.setData(user);
-        RSCPData authPwd = new RSCPData();
-        authPwd.setDataTag(RSCPTag.TAG_RSCP_AUTHENTICATION_PASSWORD);
-        authPwd.setData(password);
+        RSCPData authUser = RSCPData.builder()
+                .tag(RSCPTag.TAG_RSCP_AUTHENTICATION_USER)
+                .stringValue(user)
+                .build();
 
-        RSCPData authContainer = new RSCPData();
-        authContainer.setDataTag(RSCPTag.TAG_RSCP_REQ_AUTHENTICATION);
-        authContainer.setData(authUser);
-        authContainer.appendData(authPwd);
+        RSCPData authPwd = RSCPData.builder()
+                .tag(RSCPTag.TAG_RSCP_AUTHENTICATION_PASSWORD)
+                .stringValue(password)
+                .build();
 
-        RSCPFrame authFrame = new RSCPFrame();
-        authFrame.appendData(authContainer);
-        return authFrame.getAsBytes(true);
+        RSCPData authContainer = RSCPData.builder()
+                .tag(RSCPTag.TAG_RSCP_REQ_AUTHENTICATION)
+                .containerValues(Arrays.asList(authUser, authPwd))
+                .build();
+
+        RSCPFrame authFrame = RSCPFrame.builder()
+                .addData(authContainer)
+                .timestamp(Instant.now())
+                .build();
+        return authFrame.getAsByteArray();
     }
 }
