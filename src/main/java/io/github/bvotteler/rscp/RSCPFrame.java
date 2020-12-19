@@ -79,6 +79,10 @@ public class RSCPFrame {
                 .sum();
     }
 
+    public Instant getTimestamp() {
+        return timestamp;
+    }
+
     /**
      * <p>Get frame content as byte array. Will calculate and append checksum CRC if needed.</p>
      * <p>See also {@link Builder#withChecksum()} or {@link Builder#withoutChecksum()}.</p>

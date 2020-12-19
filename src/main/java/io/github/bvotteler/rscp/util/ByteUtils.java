@@ -38,21 +38,21 @@ public class ByteUtils {
     public static long bytesFromOffsetToLong(byte[] bytes, int offset) {
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
         buffer.put(bytes, offset, Long.BYTES);
-        buffer.flip();//need flip 
+        buffer.rewind();
         return buffer.getLong();
     }
 
     public static int bytesFromOffsetToInt(byte[] bytes, int offset) {
         ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
         buffer.put(bytes, offset, Integer.BYTES);
-        buffer.flip();//need flip 
+        buffer.rewind();
         return buffer.getInt();
     }
 
     public static short bytesFromOffsetToShort(byte[] bytes, int offset) {
         ByteBuffer buffer = ByteBuffer.allocate(Short.BYTES);
         buffer.put(bytes, offset, Short.BYTES);
-        buffer.flip();//need flip 
+        buffer.rewind();
         return buffer.getShort();
     }
 

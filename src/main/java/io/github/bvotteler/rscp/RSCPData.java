@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
+import static io.github.bvotteler.rscp.RSCPDataType.*;
 import static io.github.bvotteler.rscp.RSCPFrame.sizeTsNanoSeconds;
 import static io.github.bvotteler.rscp.RSCPFrame.sizeTsSeconds;
 
@@ -80,6 +81,80 @@ public class RSCPData {
 
     public int getByteCount() {
         return offsetData + dataLength;
+    }
+
+    public Optional<Short> getValueAsShort() {
+        if (!this.dataType.isValidShortType()) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Short.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
+        byteBuffer.rewind();
+        return Optional.of(byteBuffer.getShort());
+    }
+
+    public Optional<Integer> getValueAsInt() {
+        if (!this.dataType.isValidIntType()) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
+        byteBuffer.rewind();
+        return Optional.of(byteBuffer.getInt());
+    }
+
+    public Optional<Long> getValueAsLong() {
+        if (!this.dataType.isValidLongType()) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
+        byteBuffer.rewind();
+        return Optional.of(byteBuffer.getLong());
+    }
+
+    public Optional<Float> getValueAsFloat() {
+        if (this.dataType != FLOAT32) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
+        byteBuffer.rewind();
+        return Optional.of(byteBuffer.getFloat());
+    }
+
+    public Optional<Double> getValueAsDouble() {
+        if (this.dataType != DOUBLE64) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
+        byteBuffer.rewind();
+        return Optional.of(byteBuffer.getDouble());
+    }
+
+    public Optional<String> getValueAsString() {
+        switch (this.dataType) {
+            case STRING:
+                return Optional.of(new String(this.value, StandardCharsets.UTF_8));
+            case BOOL:
+                return Optional.of(String.format("%b", this.value[0] == 1));
+            case DOUBLE64:
+                return Optional.of(String.format("%.2f", getValueAsDouble().orElse(0.0)));
+            case FLOAT32:
+                return Optional.of(String.format("%.2f", getValueAsFloat().orElse(0.0F)));
+            case CHAR8:
+            case UCHAR8:
+            case INT16:
+            case UINT16:
+            case INT32:
+            case UINT32:
+            case INT64:
+                return Optional.of(String.format("%d", getValueAsLong().orElse(0L)));
+            // TODO: Should be able to get a few more done here eventually
+            default:
+                return Optional.empty();
+        }
     }
 
     @Override
@@ -258,7 +333,7 @@ public class RSCPData {
          */
         public Builder uint16Value(short value) {
             ByteBuffer byteBuffer = getLittleEndianByteBuffer(Short.BYTES).putShort(value);
-            return valueOfType(RSCPDataType.UINT16, byteBuffer.array());
+            return valueOfType(UINT16, byteBuffer.array());
         }
 
         /**
@@ -268,7 +343,7 @@ public class RSCPData {
          */
         public Builder int32Value(int value) {
             ByteBuffer byteBuffer = getLittleEndianByteBuffer(Integer.BYTES).putInt(value);
-            return valueOfType(RSCPDataType.INT32, byteBuffer.array());
+            return valueOfType(INT32, byteBuffer.array());
         }
 
         /**
@@ -278,7 +353,7 @@ public class RSCPData {
          */
         public Builder uint32Value(int value) {
             ByteBuffer byteBuffer = getLittleEndianByteBuffer(Integer.BYTES).putInt(value);
-            return valueOfType(RSCPDataType.UINT32, byteBuffer.array());
+            return valueOfType(UINT32, byteBuffer.array());
         }
 
         /**

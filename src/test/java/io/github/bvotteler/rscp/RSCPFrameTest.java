@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.CoreMatchers.*;
@@ -107,6 +108,21 @@ public class RSCPFrameTest {
         assertThat(containerContentTags, Matchers.hasItems(RSCPTag.TAG_DB_REQ_HISTORY_TIME_START, RSCPTag.TAG_DB_REQ_HISTORY_TIME_SPAN, RSCPTag.TAG_DB_REQ_HISTORY_TIME_INTERVAL));
     }
 
+    @Test
+    public void knownAuthResponseToFrame() {
+        RSCPFrame frame = RSCPFrame.builder().buildFromRawBytes(getSampleAuthResponseMessage());
+
+        Instant expectedTimestamp = Instant.parse("2016-10-14T04:01:03.035138Z");
+        assertThat(frame.getTimestamp(), equalTo(expectedTimestamp));
+
+        List<RSCPData> dataList = frame.getData();
+        assertThat(dataList, hasSize(1));
+
+        RSCPData data = dataList.get(0);
+        assertThat(data.getDataTag(), equalTo(RSCPTag.TAG_RSCP_AUTHENTICATION));
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(10)));
+    }
+
     private byte[] getKnownAuthFrameForTestCreds() {
         // built using 'testuser@example.com' and 'SuperSecret123'
         String template = "E3DC00114D61D45F0000000000CEED343700010000000E3000020000000D14007465737475736572406578616D706C652E636F6D030000000D0E00537570657253656372657431323360C48640";
@@ -142,6 +158,11 @@ public class RSCPFrameTest {
         System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(checksum)), 0, frame, frame.length - 4, 4);
 
         return frame;
+    }
+
+    private byte[] getSampleAuthResponseMessage() {
+        final String testAuthResponse = "e3 dc 00 11 7f 58 00 58 00 00 00 00 d0 29 18 02 08 00 01 00 80 00 03 01 00 0a b2 34 f2 4d 00 00".replaceAll("\\s+", "");
+        return ByteUtils.hexStringToByteArray(testAuthResponse);
     }
 
     private byte[] buildAuthenticationMessage(String user, String password) {
