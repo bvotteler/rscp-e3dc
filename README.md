@@ -61,7 +61,7 @@ byte[] frame = authFrame.getAsByteArray();
 ```
 
 ### Reading a received frame
-In a similar fashion, we can use the received, decrypted byte array to inspect the response.
+Similarly, we can use the received, decrypted byte array to inspect the response.
 ```java
 // assuming we have the response byte array in byte[] response...
 RSCPFrame frame = RSCPFrame.builder()
@@ -69,20 +69,20 @@ RSCPFrame frame = RSCPFrame.builder()
 
 // get the contents of the frame
 List<RSCPData> dataList = frame.getData();
-// an authentication response contains one RSCPData set with the authentication level
-// as UCHAR8 which fits into a Java short
+// an authentication response contains a single data set with the authentication level
+// as CHAR8 value which fits into a Java short
 RSCPData authData = dataList.get(0);
 // read optional short (will be empty if the data cannot be expressed as short)
 Optional<Short> authLevel = authData.getValueAsInt();
 ```
 
 ### Sample project
-We have a sample project that shows how one could use this library hosted on GitHub:
-[rscp-e3dc-sample](https://github.com/bvotteler/rscp-e3dc-sample).
+[rscp-e3dc-sample][rscpsample] is a sample project showing how this library could be used.
 
-The sample project also includes how to encrypt and decrypt frames sent to/received from
-E3DC servers.
+It shows how to construct an authentication frame, as well as a database request frame.
+In addition, it shows how to encrypt and decrypt frames sent to/received from E3DC servers.
 
+[rscpsample]: https://github.com/bvotteler/rscp-e3dc-sample
 ## Build
 Build the library with:
 
@@ -94,8 +94,8 @@ Run the tests with:
 `mvn test`
 
 ## Package and install locally
-[Configure your local repository][1] in Maven, then run:
+[Configure your local repository][mvnlocal] in Maven, then run:
 
 `mvn package install`
 
-[1]: https://maven.apache.org/guides/mini/guide-configuring-maven.html#configuring-your-local-repository
+[mvnlocal]: https://maven.apache.org/guides/mini/guide-configuring-maven.html#configuring-your-local-repository
