@@ -69,7 +69,7 @@ public class RSCPDataTest {
 
         RSCPData autarky = dataList.get(11);
         assertThat(autarky.getDataTag(), equalTo(RSCPTag.TAG_DB_AUTARKY));
-        assertThat(autarky.getValueAsString(), equalTo(Optional.of("96.84")));
+        assertThat(autarky.getValueAsString(), equalTo(Optional.of(String.format("%f", 96.84))));
 
         // another container with 13 entries
         RSCPData container = dataList.get(12);
