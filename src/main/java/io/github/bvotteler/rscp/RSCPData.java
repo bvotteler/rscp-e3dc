@@ -69,6 +69,10 @@ public class RSCPData {
         }
     }
 
+    /**
+     * Get the payload of this RSCPData instance as byte array
+     * @return A byte array containing the data.
+     */
     public byte[] getAsByteArray() {
         byte[] bytes = new byte[offsetData + dataLength];
         // copy over to final position and reverse
@@ -79,10 +83,18 @@ public class RSCPData {
         return bytes;
     }
 
+    /**
+     * Get the byte count of the entire instance.
+     * @return Number of bytes this instance holds.
+     */
     public int getByteCount() {
         return offsetData + dataLength;
     }
 
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as short. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<Short> getValueAsShort() {
         if (!this.dataType.isValidShortType()) {
             return Optional.empty();
@@ -93,6 +105,10 @@ public class RSCPData {
         return Optional.of(byteBuffer.getShort());
     }
 
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as integer. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<Integer> getValueAsInt() {
         if (!this.dataType.isValidIntType()) {
             return Optional.empty();
@@ -103,6 +119,10 @@ public class RSCPData {
         return Optional.of(byteBuffer.getInt());
     }
 
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as long. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<Long> getValueAsLong() {
         if (!this.dataType.isValidLongType()) {
             return Optional.empty();
@@ -113,6 +133,10 @@ public class RSCPData {
         return Optional.of(byteBuffer.getLong());
     }
 
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as float. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<Float> getValueAsFloat() {
         if (this.dataType != FLOAT32) {
             return Optional.empty();
@@ -123,6 +147,10 @@ public class RSCPData {
         return Optional.of(byteBuffer.getFloat());
     }
 
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as double. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<Double> getValueAsDouble() {
         if (this.dataType != DOUBLE64) {
             return Optional.empty();
@@ -133,6 +161,11 @@ public class RSCPData {
         return Optional.of(byteBuffer.getDouble());
     }
 
+    /**
+     * <p>Try to get the value contained in this RSCPData instance.</p>
+     * <p>Works for most {@link RSCPDataType}s. If not, {@link RSCPData#getValueAsByteArray()} is your best bet to obtain a value that can be interpreted manually.</p>
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as string. Otherwise, returns {@link Optional#empty()}.
+     */
     public Optional<String> getValueAsString() {
         switch (this.dataType) {
             case STRING:
