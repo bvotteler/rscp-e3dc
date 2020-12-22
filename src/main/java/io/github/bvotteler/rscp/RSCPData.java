@@ -9,6 +9,9 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static io.github.bvotteler.rscp.RSCPDataType.*;
@@ -162,6 +165,44 @@ public class RSCPData {
     }
 
     /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as Instant. Otherwise, returns {@link Optional#empty()}.
+     */
+    public Optional<Instant> getValueAsInstant() {
+        if (this.dataType != TIMESTAMP) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(sizeTsSeconds + sizeTsNanoSeconds).order(ByteOrder.LITTLE_ENDIAN);
+        byteBuffer.put(this.value);
+        byteBuffer.rewind();
+
+        long epochSeconds = byteBuffer.getLong();
+        int nanos = byteBuffer.getInt();
+
+        return Optional.of(Instant.ofEpochSecond(epochSeconds, nanos));
+    }
+
+    /**
+     * Try to get the value contained in this RSCPData instance.
+     * @return An {@link Optional} containing a value if the raw data can be interpreted as Instant. Otherwise, returns {@link Optional#empty()}.
+     */
+    public Optional<Duration> getValueAsDuration() {
+        if (this.dataType != TIMESTAMP) {
+            return Optional.empty();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(sizeTsSeconds + sizeTsNanoSeconds).order(ByteOrder.LITTLE_ENDIAN);
+        byteBuffer.put(this.value);
+        byteBuffer.rewind();
+
+        long seconds = byteBuffer.getLong();
+        int nanos = byteBuffer.getInt();
+
+        return Optional.of(Duration.ofSeconds(seconds).plusNanos(nanos));
+    }
+
+    /**
      * <p>Try to get the value contained in this RSCPData instance.</p>
      * <p>Works for most {@link RSCPDataType}s. If not, {@link RSCPData#getValueAsByteArray()} is your best bet to obtain a value that can be interpreted manually.</p>
      * @return An {@link Optional} containing a value if the raw data can be interpreted as string. Otherwise, returns {@link Optional#empty()}.
@@ -184,6 +225,9 @@ public class RSCPData {
             case UINT32:
             case INT64:
                 return Optional.of(String.format("%d", getValueAsLong().orElse(0L)));
+            case TIMESTAMP:
+                return getValueAsInstant()
+                        .map(instant -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.from(ZoneOffset.UTC)).format(instant));
             // TODO: Should be able to get a few more done here eventually
             default:
                 return Optional.empty();

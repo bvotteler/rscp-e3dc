@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.github.bvotteler.rscp.RSCPFrame.*;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -27,7 +28,7 @@ public class RSCPFrameTest {
 
         // ignore checksum and time stamps, set those to 00.
         for (int i = 0; i < RSCPFrame.sizeTsSeconds; i++) {
-            int idx = RSCPFrame.offsetTsSeconds + i;
+            int idx = offsetTsSeconds + i;
             expected[idx] = (byte) 0x00;
             actual[idx] = (byte) 0x00;
         }
@@ -94,6 +95,7 @@ public class RSCPFrameTest {
         RSCPFrame frameFromBytes = RSCPFrame.builder().buildFromRawBytes(requestWithTS);
 
         assertThat(frameFromBytes.getData(), hasSize(1));
+        assertThat(frameFromBytes.getTimestamp(), equalTo(Instant.ofEpochSecond(14)));
 
         RSCPData container = frameFromBytes.getData().get(0);
         assertThat(container.getDataTag(), is(RSCPTag.TAG_DB_REQ_HISTORY_DATA_DAY));
@@ -106,6 +108,13 @@ public class RSCPFrameTest {
                 .map(RSCPData::getDataTag)
                 .collect(Collectors.toList());
         assertThat(containerContentTags, Matchers.hasItems(RSCPTag.TAG_DB_REQ_HISTORY_TIME_START, RSCPTag.TAG_DB_REQ_HISTORY_TIME_SPAN, RSCPTag.TAG_DB_REQ_HISTORY_TIME_INTERVAL));
+
+        RSCPData timeStartData = containerContents.stream()
+                .filter(reqData -> reqData.getDataTag() == RSCPTag.TAG_DB_REQ_HISTORY_TIME_START)
+                .findFirst()
+                .get();
+
+        assertThat(timeStartData.getValueAsInstant(), equalTo(Optional.of(Instant.ofEpochSecond(timeStart))));
     }
 
     @Test
@@ -121,6 +130,41 @@ public class RSCPFrameTest {
         RSCPData data = dataList.get(0);
         assertThat(data.getDataTag(), equalTo(RSCPTag.TAG_RSCP_AUTHENTICATION));
         assertThat(data.getValueAsInt(), equalTo(Optional.of(10)));
+    }
+
+    @Test
+    public void knownDbRequestToFrame() {
+        RSCPFrame frame = builder().buildFromRawBytes(getKnownDBRequestFrame());
+
+        List<RSCPData> frameData = frame.getData();
+        assertThat(frameData, hasSize(1));
+        assertThat(frameData.get(0).getDataType(), equalTo(RSCPDataType.CONTAINER));
+
+        List<RSCPData> containerData = frameData.get(0).getContainerData();
+        assertThat(containerData, hasSize(3));
+
+        RSCPData reqStartTimeData = containerData.stream()
+                .filter(data -> data.getDataTag() == RSCPTag.TAG_DB_REQ_HISTORY_TIME_START)
+                .findFirst()
+                .get();
+        long expectedEpochSeconds = 1505309400; // request starttime value 2017-09-13T13:30:00Z
+        assertThat(reqStartTimeData.getValueAsInstant(), equalTo(Optional.of(Instant.ofEpochSecond(expectedEpochSeconds))));
+
+        RSCPData reqIntervalData = containerData.stream()
+                .filter(data -> data.getDataTag() == RSCPTag.TAG_DB_REQ_HISTORY_TIME_INTERVAL)
+                .findFirst()
+                .get();
+
+        long expectedIntervalSeconds = 900; // known request interval value
+        assertThat(reqIntervalData.getValueAsDuration(), equalTo(Optional.of(Duration.ofSeconds(expectedIntervalSeconds))));
+
+        RSCPData reqTimeSpanData = containerData.stream()
+                .filter(data -> data.getDataTag() == RSCPTag.TAG_DB_REQ_HISTORY_TIME_SPAN)
+                .findFirst()
+                .get();
+        long expectedTimeSpanSeconds = expectedIntervalSeconds; // known to be the same as interval
+        assertThat(reqTimeSpanData.getValueAsDuration(), equalTo(Optional.of(Duration.ofSeconds(expectedTimeSpanSeconds))));
+
     }
 
     private byte[] getKnownAuthFrameForTestCreds() {
@@ -142,8 +186,8 @@ public class RSCPFrameTest {
         long tsInMillis = System.currentTimeMillis();
         long tsSeconds = tsInMillis / 1000;
         int tsNanoSeconds = (int) ((tsInMillis % 1000) * 1000 * 1000);
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(tsSeconds)), 0, frame, 4, 8);
-        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(tsNanoSeconds)), 0, frame, 12, 4);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(tsSeconds)), 0, frame, offsetTsSeconds, sizeTsSeconds);
+        System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.intToBytes(tsNanoSeconds)), 0, frame, offsetTsNanoSeconds, sizeTsNanoSeconds);
 
         // insert timestart value (offset: 32), ignore nano seconds
         System.arraycopy(ByteUtils.reverseByteArray(ByteUtils.longToBytes(timeStart)), 0, frame, 32, 8);
@@ -163,6 +207,11 @@ public class RSCPFrameTest {
     private byte[] getSampleAuthResponseMessage() {
         final String testAuthResponse = "e3 dc 00 11 7f 58 00 58 00 00 00 00 d0 29 18 02 08 00 01 00 80 00 03 01 00 0a b2 34 f2 4d 00 00".replaceAll("\\s+", "");
         return ByteUtils.hexStringToByteArray(testAuthResponse);
+    }
+
+    private byte[] getKnownDBRequestFrame() {
+        final String testDBReqFrame = "e3 dc 00 11 fa 12 c2 59 00 00 00 00 c0 72 4c 12 40 00 00 01 00 06 0e 39 00 01 01 00 06 0f 0c 00 d8 32 b9 59 00 00 00 00 00 00 00 00 02 01 00 06 0f 0c 00 84 03 00 00 00 00 00 00 00 00 00 00 03 01 00 06 0f 0c 00 84 03 00 00 00 00 00 00 00 00 00 00 2d 56 ff ec".replaceAll("\\s+", "");
+        return ByteUtils.hexStringToByteArray(testDBReqFrame);
     }
 
     private byte[] buildAuthenticationMessage(String user, String password) {
