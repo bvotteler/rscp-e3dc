@@ -6,11 +6,11 @@
 
   <groupId>io.github.bvotteler</groupId>
   <artifactId>e3dc-rscp</artifactId>
-  <version>0.9.1</version>
+  <version>1.0.0</version>
   <packaging>jar</packaging>
 
   <name>e3dc-rscp-lib</name>
-  <description>Blueprint project for Java libraries to be published on Maven Central</description>
+  <description>A light weight Java library designed to convert byte arrays to and from RSCP (the proprietary protocol from E3/DC GmbH) frames and data.</description>
   <url>https://github.com/bvotteler/rscp-e3dc</url>
   <developers>
     <developer>
