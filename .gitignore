@@ -2,6 +2,9 @@
 *.iml
 *.ipr
 
+# deploy stuff
+path/
+
 # CMake
 cmake-build-*/
 
