@@ -24,9 +24,6 @@ Add a dependency in your `pom.xml`:
     </dependencies>
 ```
 
-**Note**: I am following the process on getting an initial release onto Maven central. 
-Until then, you can build, [package and install](#package-and-install-locally) it in your local Maven repository.  
-
 ### Constructing a frame
 To construct a frame, we can use `RSCPData.Builder` in combination with `RSCPFrame.Builder`.
 
@@ -93,8 +90,12 @@ Run the tests with:
 
 `mvn test`
 
-## Package and install locally
-[Configure your local repository][mvnlocal] in Maven, then run:
+## Package
+To package the project, run:
+
+`mvn package`
+
+You can also [configure your local repository][mvnlocal] for Maven, then run:
 
 `mvn package install`
 
