@@ -19,7 +19,7 @@ Add a dependency in your `pom.xml`:
         <dependency>
             <groupId>io.github.bvotteler</groupId>
             <artifactId>e3dc-rscp</artifactId>
-            <version>${project.version}</version>
+            <version>1.0.0</version>
         </dependency>
     </dependencies>
 ```
