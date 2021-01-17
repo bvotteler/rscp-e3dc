@@ -38,7 +38,7 @@ public class RSCPDataTest {
     @Test
     public void builder_validation_passes_if_value_is_missing_or_empty_for_none_type() {
         RSCPData noneData1 = RSCPData.builder().tag(RSCPTag.TAG_EMS_REQ_POWER_PV).valueOfType(RSCPDataType.NONE, new byte[0]).build();
-        RSCPData noneData2 = RSCPData.builder().tag(RSCPTag.TAG_EMS_REQ_POWER_PV).nullValue().build();
+        RSCPData noneData2 = RSCPData.builder().tag(RSCPTag.TAG_EMS_REQ_POWER_PV).noneValue().build();
 
         assertThat(noneData1.getDataType(), equalTo(RSCPDataType.NONE));
         assertThat(noneData2.getDataType(), equalTo(RSCPDataType.NONE));
@@ -49,7 +49,7 @@ public class RSCPDataTest {
 
     @Test
     public void none__can_be_serialized_and_deserialized() {
-        RSCPData noneData = RSCPData.builder().tag(RSCPTag.TAG_EMS_REQ_POWER_PV).nullValue().build();
+        RSCPData noneData = RSCPData.builder().tag(RSCPTag.TAG_EMS_REQ_POWER_PV).noneValue().build();
         byte[] noneRaw = noneData.getAsByteArray();
 
         List<RSCPData> noneDataDeserialized = RSCPData.builder().buildFromRawBytes(noneRaw);

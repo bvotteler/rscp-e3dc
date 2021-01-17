@@ -488,7 +488,7 @@ public class RSCPData {
          * Set the data type ({@link RSCPDataType#NONE}) with no value.
          * @return The builder.
          */
-        public Builder nullValue() {
+        public Builder noneValue() {
             return valueOfType(NONE, new byte[0]);
         }
 
