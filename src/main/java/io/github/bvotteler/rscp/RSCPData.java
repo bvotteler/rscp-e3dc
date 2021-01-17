@@ -228,6 +228,8 @@ public class RSCPData {
             case TIMESTAMP:
                 return getValueAsInstant()
                         .map(instant -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.from(ZoneOffset.UTC)).format(instant));
+            case NONE:
+                return Optional.of("[none]");
             // TODO: Should be able to get a few more done here eventually
             default:
                 return Optional.empty();
@@ -483,6 +485,14 @@ public class RSCPData {
         }
 
         /**
+         * Set the data type ({@link RSCPDataType#NONE}) with no value.
+         * @return The builder.
+         */
+        public Builder nullValue() {
+            return valueOfType(NONE, new byte[0]);
+        }
+
+        /**
          * Set the data type ({@link RSCPDataType#BYTEARRAY}) and value.
          * @param value The value.
          * @return The builder.
@@ -543,7 +553,10 @@ public class RSCPData {
             if (dataType == null) {
                 throw new IllegalStateException("DataType value is required.");
             }
-            if (value == null || value.length == 0) {
+            if (value == null) {
+                throw new IllegalStateException("Data must not be null.");
+            }
+            if (!NONE.equals(dataType) && value.length == 0) {
                 throw new IllegalStateException("Data must not be empty.");
             }
         }
