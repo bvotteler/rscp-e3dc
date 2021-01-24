@@ -561,7 +561,7 @@ public class RSCPData {
             if (value == null) {
                 throw new IllegalStateException("Data must not be null.");
             }
-            if (!NONE.equals(dataType) && value.length == 0) {
+            if (!NONE.equals(dataType) && !CONTAINER.equals(dataType) && value.length == 0) {
                 throw new IllegalStateException("Data must not be empty.");
             }
         }
