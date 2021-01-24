@@ -285,6 +285,11 @@ public class RSCPData {
 
             byte[] tagNameBytes = ByteUtils.copyBytesIntoNewArray(bytes, offsetDataTag, sizeDataTag);
             RSCPTag tag = RSCPTag.getTagForBytes(ByteUtils.reverseByteArray(tagNameBytes));
+            if (tag == null) {
+                logger.warn("Tag could not be matched: {}", ByteUtils.byteArrayToHexString(tagNameBytes));
+                tag = RSCPTag.getTagForBytes(
+                        ByteUtils.reverseByteArray(new byte[] { (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF }));
+            }
 
             // single byte, no need to reverse
             RSCPDataType dataType = RSCPDataType.getDataTypeForBytes(bytes[offsetDataType]);
