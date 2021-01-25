@@ -942,7 +942,8 @@ public enum RSCPTag {
     TAG_LED_BLUE("10860004"),
     TAG_LED_FW_VERSION("10860005"),
     TAG_LED_BL_VERSION("10860006"),
-    ;
+
+    UNKNOWN("FFFFFFFF"),;
 
     private static final Map<String, RSCPTag> HEX_STRING_TO_TAG = new HashMap<>();
 
