@@ -41,6 +41,9 @@ public class RSCPData {
     private final short dataLength;
     private final byte[] value; // unknown size
 
+    /* NullObjectPattern */
+    public static RSCPData NULL = RSCPData.builder().tag(RSCPTag.TAG_NONE).noneValue().build();
+
     RSCPData(RSCPTag dataTag, RSCPDataType dataType, byte[] value) {
         this.dataTag = dataTag;
         this.dataType = dataType;
