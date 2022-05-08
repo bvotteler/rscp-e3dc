@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum RSCPTag {
+    TAG_NONE("00000000"),
     TAG_RSCP_REQ_AUTHENTICATION("00000001"),
     TAG_RSCP_AUTHENTICATION_USER("00000002"),
     TAG_RSCP_AUTHENTICATION_PASSWORD("00000003"),
