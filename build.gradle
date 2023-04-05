@@ -29,7 +29,7 @@ dependencies {
 }
 
 group = 'io.github.bvotteler'
-version = '1.0.3'
+version = '1.0.3.1'
 description = 'e3dc-rscp-lib'
 java.sourceCompatibility = JavaVersion.VERSION_1_8
 
