@@ -5,24 +5,53 @@ RSCP is a proprietary protocol from [E3/DC GmbH](https://www.e3dc.com/).
 
 This library is available under the [MIT license](./LICENSE).
 
+### Changes to the original version of [bvotteler](https://github.com/bvotteler/rscp-e3dc)
+- Integrated helper classes from
+[sample application](https://github.com/bvotteler/rscp-e3dc-sample)
+- changed build system to Gradle
+
 ## Requirements
 * JDK 1.8+
-* Maven 3.6
+* Gradle 7.5
 
 ## How to use it
 
 ### Add dependency
-Add a dependency in your `pom.xml`:
+This module is **not** published to any public maven repository.
+#### Using local maven repository
+For local use,
+you can publish module `rscp-e3dc` to your local maven repo by uncommenting lines in 
+`build.gradle` and executing `gradle publishToMavenLocal`.
 
-```xml
-    <dependencies>
-        <dependency>
-            <groupId>io.github.bvotteler</groupId>
-            <artifactId>e3dc-rscp</artifactId>
-            <version>1.0.2</version>
-        </dependency>
-    </dependencies>
+To the `build.gradle` file of your project, you have to add the local mvn repo 
+and declare module dependency in the normal way:
+```groovy
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+dependencies {
+   ...
+    implementation 'io.github.bvotteler:e3dc-rscp:1.0.3.2'
+   ...
+}
 ```
+Be aware that this is discouraged in 
+[Gradle documentation](https://docs.gradle.org/current/userguide/declaring_repositories.html#sec:case-for-maven-local)
+
+#### Using the jar file directly
+
+A very simple way is to load project from github, build a jar file with `gradle jar` command
+and copy this jar into your projects libs directory.
+Then you can add a dependency in your `build.gradle`, eventually changing the version:
+
+```groovy
+    implementation files ("$projectDir/libs/e3dc-rscp-1.0.3.2.jar")
+```
+
+#### More alternatives
+There are various other ways to add 
+[Git repos as Gradle dependencies](https://alexvasilkov.com/gradle-git). 
 
 ### Constructing a frame
 To construct a frame, we can use `RSCPData.Builder` in combination with `RSCPFrame.Builder`.
@@ -80,23 +109,32 @@ It shows how to construct an authentication frame, as well as a database request
 In addition, it shows how to encrypt and decrypt frames sent to/received from E3DC servers.
 
 [rscpsample]: https://github.com/bvotteler/rscp-e3dc-sample
-## Build
-Build the library with:
 
-`mvn clean compile`
+## Typical Gradle tasks
+### Build
+Build the library (includes running tests) with:
 
-## Test
+`gradle build`
+
+### Test
 Run the tests with:
 
-`mvn test`
+`gradle test` or `gradle check`
 
-## Package
-To package the project, run:
+### Package as jar
+To package the project (includes running tests), run:
 
-`mvn package`
+`gradle jar`
 
+### Create javadoc
+`gradle javadoc`
+
+### Clean all artifacts
+`gradle clean`
+
+### Publish to local mvn repository
 You can also [configure your local repository][mvnlocal] for Maven, then run:
 
-`mvn package install`
+`gradle publishToMavenLocal`
 
 [mvnlocal]: https://maven.apache.org/guides/mini/guide-configuring-maven.html#configuring-your-local-repository
