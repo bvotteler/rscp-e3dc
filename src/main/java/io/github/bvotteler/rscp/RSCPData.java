@@ -338,7 +338,7 @@ public class RSCPData {
         /**
          * <p>Define the data type and value for this instance.</p>
          * <p>Typically, it will be easier to construct the data type and value pairs with other helper methods.</p>
-         * <p>For examples, see {@link Builder#boolValue(boolean)}, {@link Builder#char8Value(char)},
+         * <p>For examples, see {@link Builder#boolValue(boolean)}, {@link Builder#char8Value(byte)},
          * {@link Builder#int16Value(short)} , {@link Builder#int32Value(int)}, {@link Builder#stringValue(String)},
          * {@link Builder#float32Value(float)}, {@link Builder#double64Value(double)}, {@link Builder#timestampValue(Instant)} etc.</p>
          * @param dataType The {@link RSCPDataType} to associate the value with.
@@ -388,8 +388,8 @@ public class RSCPData {
          * @param value The value.
          * @return The builder.
          */
-        public Builder char8Value(char value) {
-            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Character.BYTES).putChar(value);
+        public Builder char8Value(byte value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Byte.BYTES).put(value);
             return valueOfType(RSCPDataType.CHAR8, byteBuffer.array());
         }
 
@@ -398,8 +398,8 @@ public class RSCPData {
          * @param value The value.
          * @return The builder.
          */
-        public Builder uchar8Value(char value) {
-            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Character.BYTES).putChar(value);
+        public Builder uchar8Value(byte value) {
+            ByteBuffer byteBuffer = getLittleEndianByteBuffer(Byte.BYTES).put(value);
             return valueOfType(RSCPDataType.UCHAR8, byteBuffer.array());
         }
 
