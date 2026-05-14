@@ -116,7 +116,7 @@ public class BouncyAES256Helper implements AES256Helper {
             byte[] iv = this.ivEnc;
 
             PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
-                    new CBCBlockCipher(new RijndaelEngine(messageBlockSize)), new ZeroBytePadding());
+                CBCBlockCipher.newInstance(new RijndaelEngine(messageBlockSize)), new ZeroBytePadding());
 
             int keySize = messageBlockSize / 8;
 
@@ -151,7 +151,7 @@ public class BouncyAES256Helper implements AES256Helper {
             byte[] iv = this.ivDec;
 
             PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
-                    new CBCBlockCipher(new RijndaelEngine(messageBlockSize)), new ZeroBytePadding());
+                CBCBlockCipher.newInstance(new RijndaelEngine(messageBlockSize)), new ZeroBytePadding());
 
             int keySize = messageBlockSize / 8;
 
