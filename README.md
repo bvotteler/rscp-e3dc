@@ -11,8 +11,8 @@ This library is available under the [MIT license](./LICENSE).
 - changed build system to Gradle
 
 ## Requirements
-* JDK 1.8+
-* Gradle 7.5
+* JDK 1.8+ (verified with JDK 21)
+* Gradle 7.5+ (verified with Gradle 9.5.1)
 
 ## How to use it
 
@@ -32,7 +32,7 @@ repositories {
 }
 dependencies {
    ...
-    implementation 'io.github.bvotteler:e3dc-rscp:1.0.3.2'
+    implementation 'io.github.bvotteler:e3dc-rscp:1.0.3.3'
    ...
 }
 ```
@@ -46,7 +46,7 @@ and copy this jar into your projects libs directory.
 Then you can add a dependency in your `build.gradle`, eventually changing the version:
 
 ```groovy
-    implementation files ("$projectDir/libs/e3dc-rscp-1.0.3.2.jar")
+    implementation files ("$projectDir/libs/e3dc-rscp-1.0.3.3.jar")
 ```
 
 #### More alternatives
