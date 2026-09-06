@@ -32,7 +32,7 @@ repositories {
 }
 dependencies {
    ...
-    implementation 'io.github.bvotteler:e3dc-rscp:1.0.3.3'
+    implementation 'io.github.bvotteler:e3dc-rscp:1.0.4'
    ...
 }
 ```
@@ -46,7 +46,7 @@ and copy this jar into your projects libs directory.
 Then you can add a dependency in your `build.gradle`, eventually changing the version:
 
 ```groovy
-    implementation files ("$projectDir/libs/e3dc-rscp-1.0.3.3.jar")
+    implementation files ("$projectDir/libs/e3dc-rscp-1.0.4.jar")
 ```
 
 #### More alternatives
