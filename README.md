@@ -5,11 +5,6 @@ RSCP is a proprietary protocol from [E3/DC GmbH](https://www.e3dc.com/).
 
 This library is available under the [MIT license](./LICENSE).
 
-### Changes to the original version of [bvotteler](https://github.com/bvotteler/rscp-e3dc)
-- Integrated helper classes from
-[sample application](https://github.com/bvotteler/rscp-e3dc-sample)
-- changed build system to Gradle
-
 ## Requirements
 * JDK 1.8+ (verified with JDK 21)
 * Gradle 7.5+ (verified with Gradle 9.5.1)
