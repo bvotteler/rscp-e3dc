@@ -27,3 +27,11 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 /nopom.xml
+
+# other files & folders
+.gradle
+.classpath
+.settings
+.project
+bin/
+build/

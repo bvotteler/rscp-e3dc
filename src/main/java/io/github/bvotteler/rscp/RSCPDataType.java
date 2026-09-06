@@ -66,16 +66,4 @@ public enum RSCPDataType {
     public boolean equals(byte value) {
         return this.id == value;
     }
-
-    public boolean isValidShortType() {
-        return VALID_SHORT_TYPES.contains(this);
-    }
-
-    public boolean isValidIntType() {
-        return VALID_INT_TYPES.contains(this);
-    }
-
-    public boolean isValidLongType() {
-        return VALID_LONG_TYPES.contains(this);
-    }
 }
