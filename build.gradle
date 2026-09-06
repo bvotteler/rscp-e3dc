@@ -23,7 +23,7 @@ dependencies {
 }
 
 group = 'io.github.bvotteler'
-version = '1.0.3.3'
+version = '1.0.4'
 description = '''A light weight Java library designed to convert byte arrays to and from RSCP \
 (the proprietary protocol from E3/DC GmbH) frames and data.'''
 java.sourceCompatibility = JavaVersion.VERSION_1_8
