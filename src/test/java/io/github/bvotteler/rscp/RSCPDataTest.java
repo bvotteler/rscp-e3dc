@@ -4,6 +4,8 @@ import io.github.bvotteler.rscp.util.ByteUtils;
 import org.hamcrest.CoreMatchers;
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -101,6 +103,142 @@ public class RSCPDataTest {
         assertThat(container.getContainerData(), hasSize(13));
     }
 
+    @Test
+    public void testInt32NegativeRegression() {
+        // -427 in 32-bit hex is 0xFFFFFE55. In LE: 0x55, 0xFE, 0xFF, 0xFF
+        byte[] bytes = new byte[] { (byte) 0x55, (byte) 0xFE, (byte) 0xFF, (byte) 0xFF };
+
+        RSCPData data = new RSCPData(null, RSCPDataType.INT32, bytes);
+
+        // Verifies the fix for the reported bug
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(-427)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("-427")));
+    }
+
+    @Test
+    public void testChar8Signed() {
+        RSCPData data = new RSCPData(null, RSCPDataType.CHAR8, new byte[]{(byte) 0x80});
+
+        assertThat(data.getValueAsString(), equalTo(Optional.of("-128")));
+    }
+
+    @Test
+    public void testUChar8Unsigned() {
+        RSCPData data = new RSCPData(null, RSCPDataType.UCHAR8, new byte[]{(byte) 0xFF});
+
+        assertThat(data.getValueAsString(), equalTo(Optional.of("255")));
+    }
+
+    @Test
+    public void testInt16() {
+        byte[] bytes = createLeBytes(Short.BYTES, -32768);
+        RSCPData data = new RSCPData(null, RSCPDataType.INT16, bytes);
+
+        assertThat(data.getValueAsShort(), equalTo(Optional.of((short) -32768)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("-32768")));
+    }
+
+    @Test
+    public void testUInt16() {
+        byte[] bytes = createLeBytes(Short.BYTES, 65535);
+        RSCPData data = new RSCPData(null, RSCPDataType.UINT16, bytes);
+
+        assertThat(data.getValueAsShort(), equalTo(Optional.of((short) -1)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("65535")));
+    }
+
+    @Test
+    public void testUInt32() {
+        byte[] bytes = createLeBytes(Integer.BYTES, 4294967295L);
+        RSCPData data = new RSCPData(null, RSCPDataType.UINT32, bytes);
+
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(-1)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("4294967295")));
+    }
+
+    @Test
+    public void testInt32Positive() {
+        // 123,456,789 in hex is 0x075BCD15.
+        // In Little Endian layout: 0x15, 0xCD, 0x5B, 0x07
+        byte[] bytes = new byte[] { (byte) 0x15, (byte) 0xCD, (byte) 0x5B, (byte) 0x07 };
+
+        RSCPData data = new RSCPData(null, RSCPDataType.INT32, bytes);
+
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(123456789)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("123456789")));
+    }
+
+    @Test
+    public void testInt32Negative() {
+        // -427 in 32-bit hex (Two's Complement) is 0xFFFFFE55.
+        // Ordered in Little Endian: 0x55, 0xFE, 0xFF, 0xFF
+        byte[] bytes = new byte[] { (byte) 0x55, (byte) 0xFE, (byte) 0xFF, (byte) 0xFF };
+
+        RSCPData data = new RSCPData(null, RSCPDataType.INT32, bytes);
+
+        // Asserts that the 4-byte LE pattern decodes cleanly to a signed int primitive
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(-427)));
+
+        // Asserts that String formatting correctly keeps the minus sign and value
+        assertThat(data.getValueAsString(), equalTo(Optional.of("-427")));
+    }
+
+    @Test
+    public void testInt64Positive() {
+        // 5,000,000,000 in 64-bit Long. Hex: 0x000000012A05F200
+        // In Little Endian layout: 0x00, 0xF2, 0x05, 0x2A, 0x01, 0x00, 0x00, 0x00
+        byte[] bytes = new byte[] {
+            (byte) 0x00, (byte) 0xF2, (byte) 0x05, (byte) 0x2A,
+            (byte) 0x01, (byte) 0x00, (byte) 0x00, (byte) 0x00
+        };
+
+        RSCPData data = new RSCPData(null, RSCPDataType.INT64, bytes);
+
+        assertThat(data.getValueAsLong(), equalTo(Optional.of(5000000000L)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("5000000000")));
+    }
+
+    @Test
+    public void testInt64Negative() {
+        // -5,000,000,000 (Negative 5 Billion) in 64-bit hex (Two's Complement): 0xFFFFFFFED5FA0E00
+        // In Little Endian layout: 0x00, 0x0E, 0xFA, 0xD5, 0xFE, 0xFF, 0xFF, 0xFF
+        byte[] bytes = new byte[] {
+            (byte) 0x00, (byte) 0x0E, (byte) 0xFA, (byte) 0xD5,
+            (byte) 0xFE, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF
+        };
+
+        RSCPData data = new RSCPData(null, RSCPDataType.INT64, bytes);
+
+        assertThat(data.getValueAsLong(), equalTo(Optional.of(-5000000000L)));
+        assertThat(data.getValueAsString(), equalTo(Optional.of("-5000000000")));
+    }
+
+    @Test
+    public void testSizeUpscaling() {
+        byte[] shortPayload = new byte[]{ 0x01, 0x02 };
+        RSCPData data = new RSCPData(null, RSCPDataType.INT16, shortPayload);
+
+        // A Short should seamlessly upscale into an Int and Long
+        assertThat(data.getValueAsShort(), equalTo(Optional.of((short) 513)));
+        assertThat(data.getValueAsInt(), equalTo(Optional.of(513)));
+        assertThat(data.getValueAsLong(), equalTo(Optional.of(513L)));
+    }
+
+    @Test
+    public void testInvalidByteArray() {
+        byte[] oversizedPayload = new byte[]{ 1, 2, 3, 4, 5 };
+        RSCPData data = new RSCPData(null, RSCPDataType.INT32, oversizedPayload);
+
+        // 5 bytes won't fit into 4-byte Int, expect empty
+        assertThat(data.getValueAsInt(), equalTo(Optional.empty()));
+
+        byte[] emptyPayload = new byte[0];
+        RSCPData emptyShort = new RSCPData(null, RSCPDataType.INT16, emptyPayload);
+        assertThat(emptyShort.getValueAsShort(), equalTo(Optional.empty()));
+        assertThat(emptyShort.getValueAsInt(), equalTo(Optional.empty()));
+        assertThat(emptyShort.getValueAsLong(), equalTo(Optional.empty()));
+    }
+
     private byte[] getSampleDBResponseContainerData() {
         final String testContainerData = "02 00 80 06 0a 04 00 00 00 00 00 03 00 80 06 0a 04 00 00 00 68 43 04 00 80 06 0a 04 00 00 00 04 43 05 00 80 06 0a 04 00 00 00 e0 40 06 00 80 06 0a 04 00 00 00 40 41 07 00 80 06 0a 04 00 00 00 be 43 08 00 80 06 0a 04 00 00 00 00 00 09 00 80 06 0a 04 00 00 00 00 00 0a 00 80 06 0a 04 00 00 00 e8 41 0b 00 80 06 06 04 00 5d 01 00 00 0c 00 80 06 0a 04 00 c8 55 c4 42 0d 00 80 06 0a 04 00 28 af c1 42 20 00 80 06 0e 8f 00 01 00 80 06 0a 04 00 00 00 00 00 02 00 80 06 0a 04 00 00 00 00 00 03 00 80 06 0a 04 00 00 00 00 00 04 00 80 06 0a 04 00 00 00 00 00 05 00 80 06 0a 04 00 00 00 00 00 06 00 80 06 0a 04 00 00 00 00 00 07 00 80 06 0a 04 00 00 00 00 00 08 00 80 06 0a 04 00 00 00 00 00 09 00 80 06 0a 04 00 00 00 00 00 0a 00 80 06 0a 04 00 00 00 f4 41 0b 00 80 06 06 04 00 5d 01 00 00 0c 00 80 06 0a 04 00 00 00 c8 42 0d 00 80 06 0a 04 00 00 00 c8 42".replaceAll("\\s+", "");
         return ByteUtils.hexStringToByteArray(testContainerData);
@@ -128,5 +266,19 @@ public class RSCPDataTest {
                 .tag(RSCPTag.TAG_DB_REQ_HISTORY_DATA_DAY)
                 .containerValues(Arrays.asList(reqTimeStart, reqInterval, reqTimeSpan))
                 .build();
+    }
+
+    private byte[] createLeBytes(int size, long value) {
+        ByteBuffer buffer = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN);
+        if (size == 1) {
+            buffer.put((byte) value);
+        } else if (size == 2) {
+            buffer.putShort((short) value);
+        } else if (size == 4) {
+            buffer.putInt((int) value);
+        } else if (size == 8) {
+            buffer.putLong(value);
+        }
+        return buffer.array();
     }
 }

@@ -98,17 +98,36 @@ public class RSCPData {
     }
 
     /**
+     * Try to get value contained in this RSCPData instance represented as little endian ByteBuffer of a maximum given size.
+     * @param targetSize expected maximum size of ByteBuffer to return.
+     * @return {@link Optional} of {@link ByteBuffer} in little endian order if the value can fit. Otherwise, returns {@link Optional#empty()}. 
+     */
+    private Optional<ByteBuffer> getValueAsLeBufferOfSize(int targetSize) {
+        if (this.value == null || this.value.length == 0 || this.value.length > targetSize) {
+            return Optional.empty();
+        }
+
+        byte[] padded = new byte[targetSize];
+        System.arraycopy(this.value, 0, padded, 0, this.value.length);
+
+        // Perform sign extension if the highest bit of the original value is 1 (negative),
+        // fill the remaining padded bytes with 0xFF instead of 0x00.
+        boolean isNegative = (this.value[this.value.length - 1] & 0x80) != 0;
+        if (isNegative) {
+            for (int i = this.value.length; i < targetSize; i++) {
+                padded[i] = (byte) 0xFF;
+            }
+        }
+
+        return Optional.of(ByteBuffer.wrap(padded).order(ByteOrder.LITTLE_ENDIAN));
+    }
+
+    /**
      * Try to get the value contained in this RSCPData instance.
      * @return An {@link Optional} containing a value if the raw data can be interpreted as short. Otherwise, returns {@link Optional#empty()}.
      */
     public Optional<Short> getValueAsShort() {
-        if (!this.dataType.isValidShortType()) {
-            return Optional.empty();
-        }
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Short.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
-        byteBuffer.rewind();
-        return Optional.of(byteBuffer.getShort());
+        return getValueAsLeBufferOfSize(Short.BYTES).map(ByteBuffer::getShort);
     }
 
     /**
@@ -116,13 +135,7 @@ public class RSCPData {
      * @return An {@link Optional} containing a value if the raw data can be interpreted as integer. Otherwise, returns {@link Optional#empty()}.
      */
     public Optional<Integer> getValueAsInt() {
-        if (!this.dataType.isValidIntType()) {
-            return Optional.empty();
-        }
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
-        byteBuffer.rewind();
-        return Optional.of(byteBuffer.getInt());
+        return getValueAsLeBufferOfSize(Integer.BYTES).map(ByteBuffer::getInt);
     }
 
     /**
@@ -130,13 +143,7 @@ public class RSCPData {
      * @return An {@link Optional} containing a value if the raw data can be interpreted as long. Otherwise, returns {@link Optional#empty()}.
      */
     public Optional<Long> getValueAsLong() {
-        if (!this.dataType.isValidLongType()) {
-            return Optional.empty();
-        }
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN).put(this.value);
-        byteBuffer.rewind();
-        return Optional.of(byteBuffer.getLong());
+        return getValueAsLeBufferOfSize(Long.BYTES).map(ByteBuffer::getLong);
     }
 
     /**
@@ -221,11 +228,17 @@ public class RSCPData {
             case FLOAT32:
                 return Optional.of(String.format("%.2f", getValueAsFloat().orElse(0.0F)));
             case CHAR8:
+                return Optional.of(String.valueOf(this.value[0]));
             case UCHAR8:
+                return Optional.of(String.valueOf(Byte.toUnsignedInt(this.value[0])));
             case INT16:
+                return Optional.of(String.valueOf(getValueAsShort().orElse((short) 0)));
             case UINT16:
+                return Optional.of(String.valueOf(Short.toUnsignedInt(getValueAsShort().orElse((short) 0))));
             case INT32:
+                return Optional.of(String.valueOf(getValueAsInt().orElse(0)));
             case UINT32:
+                return Optional.of(String.valueOf(Integer.toUnsignedLong(getValueAsInt().orElse(0))));
             case INT64:
                 return Optional.of(String.format("%d", getValueAsLong().orElse(0L)));
             case TIMESTAMP:
